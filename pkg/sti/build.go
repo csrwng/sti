@@ -27,7 +27,7 @@ func Build(req *STIRequest) (*STIResult, error) {
 	h := &buildRequestHandler{requestHandler: rh}
 	h.postExecutor = h
 
-	err = h.setup([]string{"assemble", "run"}, []string{"save-artifacts"}, "assemble")
+	err = h.setup([]string{"assemble", "run"}, []string{"save-artifacts"})
 	if err != nil {
 		return nil, err
 	}

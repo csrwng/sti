@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/fsouza/go-dockerclient"
 )
@@ -42,6 +43,7 @@ type requestHandler struct {
 	request      *STIRequest
 	result       *STIResult
 	postExecutor postExecutor
+	untarTimeout time.Duration
 }
 
 type STIResult struct {
@@ -50,6 +52,8 @@ type STIResult struct {
 	WorkingDir string
 	ImageID    string
 }
+
+const DefaultUntarTimeout = 2 * time.Minute
 
 type postExecutor interface {
 	postExecute(container *docker.Container) error
@@ -66,10 +70,10 @@ func newHandler(req *STIRequest) (*requestHandler, error) {
 		return nil, ErrDockerConnectionFailed
 	}
 
-	return &requestHandler{dockerClient, req, nil, nil}, nil
+	return &requestHandler{dockerClient, req, nil, nil, DefaultUntarTimeout}, nil
 }
 
-func (h *requestHandler) setup(requiredScripts, optionalScripts []string, command string) error {
+func (h *requestHandler) setup(requiredScripts, optionalScripts []string) error {
 	var err error
 	h.request.workingDir, err = createWorkingDirectory()
 	if err != nil {

@@ -1,6 +1,3 @@
-/*
-The 'sti' binary.
-*/
 package main
 
 import (

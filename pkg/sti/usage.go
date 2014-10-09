@@ -10,7 +10,7 @@ func Usage(req *STIRequest) error {
 	}
 	defer h.cleanup()
 
-	err = h.setup([]string{"usage"}, []string{}, "usage")
+	err = h.setup([]string{"usage"}, []string{})
 	if err != nil {
 		return err
 	}

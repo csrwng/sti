@@ -24,7 +24,8 @@ func (h *requestHandler) createTarUpload() (string, error) {
 	uploadDir := filepath.Join(h.request.workingDir, "upload")
 
 	err = filepath.Walk(uploadDir, func(path string, info os.FileInfo, err error) error {
-		if !info.IsDir() && strings.Index(path, ".git") == -1 {
+
+		if !info.IsDir() && !hasGit(path) {
 			header, err := tar.FileInfoHeader(info, "")
 			if err != nil {
 				return err
@@ -69,10 +70,20 @@ func (h *requestHandler) createTarUpload() (string, error) {
 	return tarFile.Name(), nil
 }
 
+func hasGit(path string) bool {
+	parts := strings.Split(path, string(os.PathSeparator))
+	for _, s := range parts {
+		if s == ".git" {
+			return true
+		}
+	}
+	return false
+}
+
 func (h *requestHandler) extractTarStream(artifactTmpDir string, reader io.Reader) error {
 	tarReader := tar.NewReader(reader)
 	errorChannel := make(chan error)
-	timeout := 5 * time.Second
+	timeout := h.untarTimeout
 	timeoutTimer := time.NewTimer(timeout)
 	go func() {
 		for {
@@ -104,7 +115,6 @@ func (h *requestHandler) extractTarStream(artifactTmpDir string, reader io.Reade
 					errorChannel <- err
 					break
 				}
-				//TODO should this be OpenFile so we can set the perms to 600 or 660?
 				path := filepath.Join(artifactTmpDir, header.Name)
 				if h.request.Verbose {
 					log.Printf("Creating %s", path)
@@ -115,8 +125,6 @@ func (h *requestHandler) extractTarStream(artifactTmpDir string, reader io.Reade
 					errorChannel <- err
 					break
 				}
-				defer file.Close()
-
 				if h.request.Verbose {
 					log.Printf("Extracting/writing %s", path)
 				}
@@ -130,6 +138,21 @@ func (h *requestHandler) extractTarStream(artifactTmpDir string, reader io.Reade
 					message := fmt.Sprintf("Wrote %d bytes, expected to write %d\n", written, header.Size)
 					log.Println(message)
 					errorChannel <- fmt.Errorf(message)
+					break
+				}
+				if err = file.Chmod(header.FileInfo().Mode()); err != nil {
+					log.Printf("Error setting file mode: %v", err)
+					errorChannel <- err
+					break
+				}
+				if err = file.Close(); err != nil {
+					log.Printf("Error closing file: %v", err)
+					errorChannel <- err
+					break
+				}
+				if err = os.Chtimes(path, time.Now(), header.FileInfo().ModTime()); err != nil {
+					log.Printf("Error setting file dates: %v", err)
+					errorChannel <- err
 					break
 				}
 				if h.request.Verbose {
